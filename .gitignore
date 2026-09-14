@@ -10,6 +10,7 @@ venv/
 data/
 artifacts/
 reports/figures/
+reports/eda/
 models/*.pt
 models/*.pth
 !models/.gitkeep

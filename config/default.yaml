@@ -12,4 +12,6 @@ test_fraction: 0.15
 model: mobilenet_v3_small
 pretrained: true
 freeze_backbone_epochs: 2
+class_weighted_loss: true
+max_samples_per_class: null
 device: auto

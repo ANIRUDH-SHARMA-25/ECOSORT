@@ -1,11 +1,12 @@
 """Dataset validation, deterministic splits, and image transforms."""
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Sequence
 
 from PIL import Image, UnidentifiedImageError
+import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 
@@ -96,3 +97,31 @@ def stratified_split(samples: Sequence[tuple[str, int]], val_fraction: float, te
 
 def class_distribution(samples: Sequence[tuple[str, int]]) -> dict[int, int]:
     return dict(Counter(label for _, label in samples))
+
+
+def limit_samples_per_class(samples: Sequence[tuple[str, int]], limit: int | None, seed: int) -> list[tuple[str, int]]:
+    """Select an equal, reproducible cap per class for smoke tests; `None` preserves all data."""
+    if limit is None:
+        return list(samples)
+    if limit < 3:
+        raise ValueError("max_samples_per_class must be at least 3 for stratified splits.")
+    generator = torch.Generator().manual_seed(seed)
+    grouped: dict[int, list[tuple[str, int]]] = defaultdict(list)
+    for sample in samples:
+        grouped[sample[1]].append(sample)
+    selected: list[tuple[str, int]] = []
+    for label, group in grouped.items():
+        if len(group) < limit:
+            raise ValueError(f"Class {label} has only {len(group)} samples; cannot select {limit}.")
+        order = torch.randperm(len(group), generator=generator).tolist()
+        selected.extend(group[index] for index in order[:limit])
+    return selected
+
+
+def class_weights(samples: Sequence[tuple[str, int]], num_classes: int) -> torch.Tensor:
+    """Return normalized inverse-frequency weights derived exclusively from training samples."""
+    counts = torch.tensor([sum(label == index for _, label in samples) for index in range(num_classes)], dtype=torch.float32)
+    if torch.any(counts == 0):
+        raise ValueError("Every class must occur in the training split before computing class weights.")
+    weights = counts.sum() / (num_classes * counts)
+    return weights / weights.mean()

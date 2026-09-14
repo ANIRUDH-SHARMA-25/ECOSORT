@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import torch
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, precision_recall_fscore_support
+from sklearn.metrics import accuracy_score, balanced_accuracy_score, confusion_matrix, precision_recall_fscore_support
 
 
 def predict_loader(model, loader, device: torch.device) -> tuple[np.ndarray, np.ndarray]:
@@ -23,9 +23,10 @@ def predict_loader(model, loader, device: torch.device) -> tuple[np.ndarray, np.
 def classification_metrics(targets: np.ndarray, predictions: np.ndarray, classes: list[str]) -> dict:
     """Calculate overall and per-class metrics."""
     precision, recall, f1, _ = precision_recall_fscore_support(targets, predictions, labels=range(len(classes)), zero_division=0)
-    return {"accuracy": float(accuracy_score(targets, predictions)), "macro_precision": float(np.mean(precision)),
+    supports = np.bincount(targets, minlength=len(classes))
+    return {"accuracy": float(accuracy_score(targets, predictions)), "balanced_accuracy": float(balanced_accuracy_score(targets, predictions)), "macro_precision": float(np.mean(precision)),
             "macro_recall": float(np.mean(recall)), "macro_f1": float(np.mean(f1)),
-            "per_class": pd.DataFrame({"class": classes, "precision": precision, "recall": recall, "f1": f1})}
+            "per_class": pd.DataFrame({"class": classes, "support": supports, "precision": precision, "recall": recall, "f1": f1})}
 
 
 def save_evaluation(targets: np.ndarray, predictions: np.ndarray, classes: list[str], history: dict[str, list[float]], output_dir: str | Path) -> dict:

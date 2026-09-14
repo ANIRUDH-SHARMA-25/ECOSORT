@@ -13,7 +13,8 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 
 from .config import get_device, load_config, set_seed
-from .data import ImagePathsDataset, collect_samples, stratified_split, build_transforms, validate_dataset
+from .data import (ImagePathsDataset, build_transforms, class_weights, collect_samples,
+                   limit_samples_per_class, stratified_split, validate_dataset)
 from .evaluate import predict_loader, save_evaluation
 from .models import build_model, freeze_backbone
 from .train import fit
@@ -21,6 +22,7 @@ from .train import fit
 
 def _loaders(config, classes):
     samples = collect_samples(config["data_dir"], classes)
+    samples = limit_samples_per_class(samples, config.get("max_samples_per_class"), config["seed"])
     train, val, test = stratified_split(samples, config["validation_fraction"], config["test_fraction"], config["seed"])
     args = {"batch_size": config["batch_size"], "num_workers": config["num_workers"], "pin_memory": torch.cuda.is_available()}
     return (DataLoader(ImagePathsDataset(train, build_transforms(config["image_size"], True)), shuffle=True, **args),
@@ -42,11 +44,12 @@ def train_command(config_path: str, model_override: str | None = None) -> tuple[
     # this keeps optimizer and scheduler parameter groups stable when unfreezing.
     optimizer = AdamW(model.parameters(), lr=config["learning_rate"], weight_decay=config["weight_decay"])
     checkpoint = Path(config["artifact_dir"]) / f"best_{config['model']}.pt"
+    weights = class_weights(train_loader.dataset.samples, len(classes)).to(device) if config.get("class_weighted_loss", False) else None
     def epoch_hook(epoch, history, _best):
         if config["model"] == "mobilenet_v3_small" and epoch == config.get("freeze_backbone_epochs", 0):
             freeze_backbone(model, config["model"], False)
         print(f"Epoch {epoch}/{config['epochs']} | train acc {history['train_accuracy'][-1]:.3f} | val acc {history['val_accuracy'][-1]:.3f}")
-    history = fit(model, train_loader, val_loader, optimizer, nn.CrossEntropyLoss(), device, config["epochs"], checkpoint,
+    history = fit(model, train_loader, val_loader, optimizer, nn.CrossEntropyLoss(weight=weights), device, config["epochs"], checkpoint,
                   config["model"], classes, config["image_size"], ReduceLROnPlateau(optimizer, patience=2), epoch_hook)
     checkpoint_data = torch.load(checkpoint, map_location=device, weights_only=False); model.load_state_dict(checkpoint_data["model_state"])
     targets, predictions = predict_loader(model, test_loader, device)

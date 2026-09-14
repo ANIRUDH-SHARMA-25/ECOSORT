@@ -49,6 +49,32 @@ Do not commit `data/`: it is deliberately ignored. Validate the extraction first
 python -m ecosort validate --data-dir data/raw
 ```
 
+### Reproducible Kaggle download
+
+EcoSort includes a preparation script for the selected [Garbage Classification (12 classes) dataset](https://www.kaggle.com/datasets/mostafaabla/garbage-classification), which has 15,150 images across paper, cardboard, biological, metal, plastic, green/brown/white glass, clothes, shoes, batteries, and trash. It downloads the archive and normalizes any nested Kaggle extraction directory into `data/raw/<class>/...`.
+
+1. With `.venv` activated, run `kaggle auth login` and complete the browser-based Kaggle authorization. Credentials are stored outside this repository.
+2. With dependencies installed, run:
+
+```powershell
+python scripts/download_dataset.py
+python -m ecosort validate --data-dir data/raw
+```
+
+If browser authorization is unavailable, create a Kaggle API token from [Kaggle Settings](https://www.kaggle.com/settings/api) and provide it through the client’s supported `KAGGLE_API_TOKEN` environment variable. Never commit credentials.
+
+The script will not replace a non-empty `data/raw` directory. Review it first; only use `--force` when intentionally re-preparing the dataset. This workflow downloads data only—it does not start training.
+
+### Dataset EDA and split checks
+
+Generate class-distribution CSV/plot, a leakage-free split report, and an augmentation preview before training:
+
+```powershell
+python scripts/eda.py --data-dir data/raw --output-dir reports/eda
+```
+
+`reports/eda/class_distribution.csv` records the class counts in each stratified split. The training code uses inverse-frequency class-weighted cross-entropy by default (`class_weighted_loss: true`) so large classes such as `clothes` do not dominate optimization. Use balanced accuracy, macro precision/recall/F1, and the per-class report—not raw accuracy alone—to compare models.
+
 ## Local setup
 
 Python 3.10+ is recommended. Create and activate a virtual environment, then install dependencies:
@@ -80,6 +106,22 @@ python -m ecosort compare --config config/default.yaml
 ```
 
 Each run creates `artifacts/best_<model>.pt`, plus `artifacts/<model>/summary_metrics.csv`, `per_class_metrics.csv`, `confusion_matrix.png`, and `training_curves.png`. The comparison creates `artifacts/model_comparison.csv` and copies the best evaluated model to `models/best_model.pt` for Streamlit. Checkpoints are intentionally gitignored; attach a small chosen checkpoint to a GitHub release, cloud storage, or rebuild it during deployment if it is too large for practical repository use.
+
+### Smoke training
+
+Before a full experiment, run the one-epoch integration smoke test. It uses an equal cap of 10 images per class at 64px and is deliberately unsuitable for comparing real model quality:
+
+```powershell
+python -m ecosort compare --config config/smoke.yaml
+```
+
+It verifies both architectures, training/backpropagation, checkpoint save/reload, evaluation CSVs/plots, and app-compatible inference. Outputs live in ignored `artifacts/smoke/`.
+
+### GPU training recommendation
+
+This project’s default dependencies are CPU-compatible for reliable Streamlit deployment. On the checked development machine, an NVIDIA GeForce RTX 4060 Laptop GPU is present, but the installed PyTorch build is CPU-only. For full training, use this local GPU after installing the CUDA-enabled PyTorch/torchvision wheel selected for your Windows driver on the official [PyTorch installation page](https://pytorch.org/get-started/locally/), then confirm `torch.cuda.is_available()` returns `True`.
+
+That local RTX 4060 should be substantially faster and more convenient than CPU training for this dataset. Kaggle or Colab GPU is a good alternative only if you prefer a cloud notebook, need a longer unattended run, or cannot enable CUDA locally.
 
 ## Run inference app
 
