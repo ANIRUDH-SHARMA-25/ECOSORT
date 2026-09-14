@@ -1,0 +1,15 @@
+seed: 42
+data_dir: data/raw
+artifact_dir: artifacts
+image_size: 224
+batch_size: 32
+num_workers: 2
+epochs: 15
+learning_rate: 0.001
+weight_decay: 0.0001
+validation_fraction: 0.15
+test_fraction: 0.15
+model: mobilenet_v3_small
+pretrained: true
+freeze_backbone_epochs: 2
+device: auto

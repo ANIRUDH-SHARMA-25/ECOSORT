@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+.venv/
+venv/
+
+# Data and generated outputs (never commit datasets or large checkpoints)
+data/
+artifacts/
+reports/figures/
+models/*.pt
+models/*.pth
+!models/.gitkeep
+
+# Streamlit and editors
+.streamlit/secrets.toml
+.vscode/
+.idea/
+.DS_Store
