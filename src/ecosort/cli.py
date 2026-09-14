@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 import shutil
+import time
 from pathlib import Path
 
 import torch
@@ -52,11 +53,20 @@ def train_command(config_path: str, model_override: str | None = None) -> tuple[
         if config["model"] == "mobilenet_v3_small" and epoch == config.get("freeze_backbone_epochs", 0):
             freeze_backbone(model, config["model"], False)
         print(f"Epoch {epoch}/{config['epochs']} | train acc {history['train_accuracy'][-1]:.3f} | val acc {history['val_accuracy'][-1]:.3f}")
+    started_at = time.perf_counter()
     history = fit(model, train_loader, val_loader, optimizer, nn.CrossEntropyLoss(weight=weights), device, config["epochs"], checkpoint,
-                  config["model"], classes, config["image_size"], ReduceLROnPlateau(optimizer, patience=2), epoch_hook)
+                  config["model"], classes, config["image_size"], ReduceLROnPlateau(optimizer, patience=2), epoch_hook,
+                  early_stopping_patience=config.get("early_stopping_patience"), mixed_precision=config.get("mixed_precision", False))
+    training_duration_seconds = time.perf_counter() - started_at
     checkpoint_data = torch.load(checkpoint, map_location=device, weights_only=False); model.load_state_dict(checkpoint_data["model_state"])
     targets, predictions = predict_loader(model, test_loader, device)
     metrics = save_evaluation(targets, predictions, classes, history, Path(config["artifact_dir"]) / config["model"])
+    metrics["best_epoch"] = checkpoint_data["epoch"]
+    metrics["best_validation_accuracy"] = checkpoint_data["val_accuracy"]
+    metrics["training_duration_seconds"] = training_duration_seconds
+    import pandas as pd
+    pd.DataFrame([{key: value for key, value in metrics.items() if key != "per_class"}]).to_csv(
+        Path(config["artifact_dir"]) / config["model"] / "summary_metrics.csv", index=False)
     print(json.dumps({key: value for key, value in metrics.items() if key != "per_class"}, indent=2))
     print(f"Best checkpoint: {checkpoint}")
     return metrics, checkpoint

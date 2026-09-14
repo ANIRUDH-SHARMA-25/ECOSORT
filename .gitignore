@@ -14,6 +14,7 @@ reports/eda/
 models/*.pt
 models/*.pth
 !models/.gitkeep
+!models/best_model.pt
 
 # Streamlit and editors
 .streamlit/secrets.toml

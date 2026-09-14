@@ -9,7 +9,7 @@ EcoSort is an end-to-end PyTorch computer-vision project that classifies waste-m
 - Custom CNN baseline and pretrained MobileNetV3-Small transfer-learning model
 - Best-validation checkpointing, configurable YAML hyperparameters, and reproducible seeds
 - Accuracy, macro precision/recall/F1, per-class CSV, confusion matrix, and learning curves
-- A comparison command which selects the best test-accuracy checkpoint for the app
+- Validation-selected deployment checkpoint committed for straightforward Streamlit deployment
 - Safe JPG/JPEG/PNG uploads, invalid-image messaging, and missing-model messaging
 
 ## Repository layout
@@ -17,7 +17,7 @@ EcoSort is an end-to-end PyTorch computer-vision project that classifies waste-m
 ```text
 app/                 Streamlit UI
 config/default.yaml  training settings
-models/              optional small deployment checkpoint (not committed)
+models/              selected 6.26 MB deployment checkpoint
 src/ecosort/         production package
 tests/               unit tests
 artifacts/           generated checkpoints and evaluation reports (ignored)
@@ -25,6 +25,10 @@ data/                downloaded dataset (ignored)
 ```
 
 ## Dataset
+
+### Dataset summary
+
+The prepared Kaggle dataset contains **15,515 valid images** in 12 classes: battery, biological, brown-glass, cardboard, clothes, green-glass, metal, paper, plastic, shoes, trash, and white-glass. Validation found no unreadable files. The fixed seed creates a stratified **70%/15%/15%** train/validation/test split with no path overlap.
 
 Use the public [Kaggle Garbage Classification dataset](https://www.kaggle.com/datasets/mostafaabla/garbage-classification) or another waste image dataset with one directory per class. The project discovers class names dynamically, so it supports the approximately 12-category Kaggle variant without source-code changes.
 
@@ -105,7 +109,20 @@ Run the complete comparison and select the winner:
 python -m ecosort compare --config config/default.yaml
 ```
 
-Each run creates `artifacts/best_<model>.pt`, plus `artifacts/<model>/summary_metrics.csv`, `per_class_metrics.csv`, `confusion_matrix.png`, and `training_curves.png`. The comparison creates `artifacts/model_comparison.csv` and copies the best evaluated model to `models/best_model.pt` for Streamlit. Checkpoints are intentionally gitignored; attach a small chosen checkpoint to a GitHub release, cloud storage, or rebuild it during deployment if it is too large for practical repository use.
+Each run creates `artifacts/best_<model>.pt`, plus `artifacts/<model>/summary_metrics.csv`, `per_class_metrics.csv`, `confusion_matrix.png`, and `training_curves.png`. The comparison creates `artifacts/model_comparison.csv` and copies the best evaluated model to `models/best_model.pt` for Streamlit. Experiment checkpoints remain gitignored; the selected 6.26 MB deployment checkpoint is the intentional exception.
+
+### Final measured results
+
+Both models were trained on the same fixed stratified split with inverse-frequency weighted cross-entropy. The test set was kept untouched until one final evaluation of the validation-selected checkpoint.
+
+| Model | Best epoch | Training duration | Test accuracy | Balanced accuracy | Macro F1 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Custom CNN | 22 / 25 | 20.0 min | 67.74% | 66.76% | 62.69% |
+| MobileNetV3-Small | 13 (stopped at 18 / 20) | 11.6 min | 95.96% | 95.21% | 94.93% |
+
+MobileNetV3-Small is the selected deployment model because it achieved the strongest validation result (96.61%) and materially better balanced and macro test metrics. Its 6.26 MB CPU-loadable checkpoint is committed at `models/best_model.pt`; the dataset, experiment checkpoints, reports, and caches remain ignored.
+
+The final Custom CNN configuration used 224px images, batch size 64, a learning rate of `1e-3`, CUDA mixed precision, weighted loss, and patience-6 early stopping. MobileNetV3-Small used pretrained weights, 224px images, batch size 32, a learning rate of `3e-4`, two frozen-backbone epochs, CUDA mixed precision, weighted loss, and patience-5 early stopping.
 
 ### Smoke training
 
@@ -138,7 +155,7 @@ Expected verification includes a `+cu130` Torch version, `True`, and `NVIDIA GeF
 
 ## Run inference app
 
-First run `compare` or place a compatible checkpoint at `models/best_model.pt`. Then:
+The selected checkpoint is already included in `models/best_model.pt`. Start locally:
 
 ```powershell
 streamlit run app/app.py
@@ -148,10 +165,10 @@ To use another checkpoint, set `ECOSORT_MODEL_PATH` to its path before starting 
 
 ## Streamlit Community Cloud deployment
 
-1. Push this repository, excluding datasets and large artifacts.
-2. Make `models/best_model.pt` available in the repository only if it is comfortably within GitHub and Cloud limits. Otherwise have a deployment build step retrieve a trusted release asset, or deploy after adding the selected small checkpoint through your hosting workflow. Do not hardcode personal file paths.
-3. In Community Cloud select `app/app.py` as the entry point and use `requirements.txt`.
-4. If the checkpoint lives elsewhere in the deployed filesystem, configure `ECOSORT_MODEL_PATH`; the app will display an actionable message when it is unavailable.
+1. Push this repository; `models/best_model.pt` is only 6.26 MB and is intentionally committed. Datasets, artifacts, and caches remain excluded.
+2. In Streamlit Community Cloud, create an app from this repository and select `app/app.py` as the entry point.
+3. Use the default Python version supported by `requirements.txt`; Community Cloud installs CPU PyTorch automatically, which is supported by EcoSort inference.
+4. Deploy. No secrets are required. Leave `ECOSORT_MODEL_PATH` unset to use the committed checkpoint; set it only when deliberately deploying a different compatible checkpoint.
 
 ## Tests
 
