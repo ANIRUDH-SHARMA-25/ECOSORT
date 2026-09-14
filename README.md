@@ -2,6 +2,15 @@
 
 EcoSort is an end-to-end PyTorch computer-vision project that classifies waste-material images. It trains a compact custom CNN and a MobileNetV3 transfer-learning model, evaluates both comprehensively, and serves the chosen checkpoint with a CPU-friendly Streamlit app.
 
+**Live app:** [https://ecosort-app.streamlit.app](https://ecosort-app.streamlit.app)
+
+**Deployment model:** MobileNetV3-Small, selected from validation performance and served with CPU-compatible inference.
+
+| Model | Test accuracy | Balanced accuracy | Macro F1 |
+| --- | ---: | ---: | ---: |
+| Custom CNN | 67.74% | 66.76% | 62.69% |
+| **MobileNetV3-Small (selected)** | **95.96%** | **95.21%** | **94.93%** |
+
 ## Highlights
 
 - Dataset validation plus reproducible stratified train/validation/test splits
