@@ -1,0 +1,5 @@
+# Install after requirements.txt for local NVIDIA GPU training only.
+# Official PyTorch CUDA 13.0 wheels; keep requirements.txt CPU-compatible for Streamlit.
+--index-url https://download.pytorch.org/whl/test/cu130
+torch==2.14.0+cu130
+torchvision==0.29.0+cu130

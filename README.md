@@ -117,11 +117,24 @@ python -m ecosort compare --config config/smoke.yaml
 
 It verifies both architectures, training/backpropagation, checkpoint save/reload, evaluation CSVs/plots, and app-compatible inference. Outputs live in ignored `artifacts/smoke/`.
 
+On a CUDA-enabled machine, use `config/smoke-gpu.yaml` instead. Training automatically stores any pretrained-weight cache below the ignored configured `artifact_dir`, rather than a user-profile cache.
+
 ### GPU training recommendation
 
 This project’s default dependencies are CPU-compatible for reliable Streamlit deployment. On the checked development machine, an NVIDIA GeForce RTX 4060 Laptop GPU is present, but the installed PyTorch build is CPU-only. For full training, use this local GPU after installing the CUDA-enabled PyTorch/torchvision wheel selected for your Windows driver on the official [PyTorch installation page](https://pytorch.org/get-started/locally/), then confirm `torch.cuda.is_available()` returns `True`.
 
 That local RTX 4060 should be substantially faster and more convenient than CPU training for this dataset. Kaggle or Colab GPU is a good alternative only if you prefer a cloud notebook, need a longer unattended run, or cannot enable CUDA locally.
+
+For this RTX 4060 machine, the NVIDIA driver exposes CUDA 13.3 and EcoSort includes the matching official PyTorch CUDA 13.0 wheel pins in `requirements-gpu.txt`. Keep `requirements.txt` unchanged for CPU Streamlit deployments. To enable the local training environment, run the following in a normal PowerShell window (the download is approximately 2 GB):
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m pip uninstall -y torch torchvision
+python -m pip install -r requirements-gpu.txt
+python -c "import torch; print(torch.__version__); print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0))"
+```
+
+Expected verification includes a `+cu130` Torch version, `True`, and `NVIDIA GeForce RTX 4060 Laptop GPU`. Then rerun `pytest -q` and `python -m ecosort compare --config config/smoke.yaml` before beginning a full run.
 
 ## Run inference app
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 from pathlib import Path
 
@@ -32,6 +33,8 @@ def _loaders(config, classes):
 
 def train_command(config_path: str, model_override: str | None = None) -> tuple[dict, Path]:
     config = load_config(config_path); config["model"] = model_override or config["model"]
+    # Keep pretrained-weight downloads with ignored experiment artifacts, not in a user-profile cache.
+    os.environ.setdefault("TORCH_HOME", str(Path(config["artifact_dir"]) / "torch-cache"))
     set_seed(config["seed"])
     status = validate_dataset(config["data_dir"])
     if not status["valid"]:
